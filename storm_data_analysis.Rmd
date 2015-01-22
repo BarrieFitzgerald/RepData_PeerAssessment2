@@ -1,0 +1,208 @@
+# Reproducible Research: Peer Assessment 2
+Barrie D. Fitzgerald  
+January 22, 2015
+
+## Severe Weather and the Impact on the United States' Public Health and Economy
+
+### Synposis
+This analysis attempts to examine data collected from United States National Oceanic and Atmospheric Administration (NOAA) to determine the impact of the weather within the United States on the public health and economy. The data collected by NOAA ranges from 1950 to 2011; however, for this analysis the data was filtered down to a 15-year trend (1997-2011) to provide a relevant analysis for planning purposes. In terms of the public health, fatalities largely are resulted from excessive heat and tornadoes, while injuries are tornadoes and floods. The economic impact in terms of property damage largely comes from thunderstorms winds, flash floods, and tornadoes. Important to note, especially for the rural agricultural locations, e.g., Southern and Mid-western states, the economic impact, in terms of crop damage, stems from hail, flash floods, and floods.  
+
+
+### Data Processing
+
+#### Basic Settings
+First, we establish the working directory, locate the file needed, set data options, and load any libraries used.  
+```{r basic set up, echo=TRUE}
+## Set ups
+setwd("C:/Users/bdfitzgerald/Desktop/Data Science Specialist/RepData_PeerAssessment2")
+file <- list.files("data", full.names = TRUE)
+        ## libraries used
+options(scipen = 1)
+library(lubridate)
+library(ggplot2)
+library(gridExtra)
+library(plyr)
+```
+
+##### Pulling in the dataset
+Load the data file into R to begin the analysis.
+```{r original dataset, echo=TRUE, cache=TRUE}
+## importing the data file
+## NOTE the cache needs to be "cache = TRUE"
+stormdata <- read.csv(file)
+```
+
+##### Structure of data
+Examine the basic structure of the data.  
+```{r data structur, echo=TRUE, results='markup'}
+## Understanding basics of data before data clean up
+        ## data dimensions
+dim(stormdata)
+        ## data class
+sapply(stormdata, class)
+        ## first two rows
+head(stormdata, 2)
+```
+
+##### Cleaning up the evotypes
+Quick analysis of the event types (EVTYPES) there was inconsistency in the capitalization of the events. HAIL and hail would be listed, which would cause multiple responses. To combat this issue, all event types were lower-cased so that the aggregation would produce decent results.  
+```{r data clean up, echo=TRUE}
+## Since using EVTYPE as the primiary incident
+        ## Number of unique incidents
+length(unique(stormdata$EVTYPE))
+        ## examining notice no consistency in the EVTYPE...some are all caps, some not, some have a space before them
+        ## adjusting the EVTYPE to have consistency in the data
+evtypes <- tolower(stormdata$EVTYPE)
+evtypes <- gsub("[[:blank:][:punct:]+]", " ", evtypes)
+stormdata$EVTYPE <- evtypes
+```
+
+##### Events over the course of the years
+The number of years the data was collected for the four categories were analyzed to determine if the data set needs to be filtered down to a more relevant trend.  
+```{r data years of events, echo=TRUE, cache=TRUE}
+## BY year
+stormdata$YEAR <- as.numeric(format(as.Date(stormdata$BGN_DATE, format = "%m/%d/%Y %H:%M:%S"), "%Y"))
+fatal_year <- aggregate(stormdata$FATALITIES, by = list(DATE = stormdata$YEAR), sum, na.rm = TRUE)
+colnames(fatal_year)[2] <- "FATALITIES"
+injury_year <- aggregate(stormdata$INJURIES, by = list(DATE = stormdata$YEAR), sum, na.rm = TRUE)
+colnames(injury_year)[2] <- "INJURIES"
+prop_year <- aggregate(stormdata$PROPDMG, by = list(DATE = stormdata$YEAR), sum, na.rm = TRUE)
+colnames(prop_year)[2] <- "PROP_DMG"
+crop_year <- aggregate(stormdata$CROPDMG, by = list(DATE = stormdata$YEAR), sum, na.rm = TRUE)
+colnames(crop_year)[2] <- "CROP_DMG"
+        ## Charts
+fat_year <- ggplot(fatal_year, aes(x = DATE, y = FATALITIES)) +
+        geom_line(size = 1, color = "firebrick") +
+        ylim(min(fatal_year$FATALITIES), max(fatal_year$FATALITIES)) +
+        xlab("Year") +
+        ylab("Number of Fatalities") +
+        ggtitle("Number of Fatalities from 1950 to 2011") +
+        theme(plot.title = element_text(size = 10, face = "bold"))
+inj_year <- ggplot(injury_year, aes(x = DATE, y = INJURIES)) +
+        geom_line(size = 1, color = "firebrick") +
+        ylim(min(injury_year$INJURIES), max(injury_year$INJURIES)) +
+        xlab("Year") +
+        ylab("Number of Injuries") +
+        ggtitle("Number of Injuries from 1950 to 2011") +
+        theme(legend.position = "none", plot.title = element_text(size = 10, face = "bold"))
+propdmg_year <- ggplot(prop_year, aes(x = DATE, y = PROP_DMG)) +
+        geom_line(size = 1, color = "firebrick") +
+        ylim(min(prop_year$PROP_DMG), max(prop_year$PROP_DMG)) +
+        xlab("Year") +
+        ylab("Total Property Damage") +
+        ggtitle("Amount of Property Damage from 1950 to 2011") +
+        theme(plot.title = element_text(size = 10, face = "bold"))
+cropdmg_year <- ggplot(crop_year, aes(x = DATE, y = CROP_DMG)) +
+        geom_line(size = 1, color = "firebrick") +
+        ylim(min(crop_year$CROP_DMG), max(crop_year$CROP_DMG)) +
+        xlab("Year") +
+        ylab("Total Crop Damage") +
+        ggtitle("Amount of Crop Damage from 1950 to 2011") +
+        theme(legend.position = "none", plot.title = element_text(size = 10, face = "bold"))
+```
+
+Exhibit 1 shows that years that the data was available and the years that the data was started to be collected. For example in the Crop Damage chart data wasn't collected until 1993. Upon examination of all line charts, there seemed to have been a spike in the amount of data collected regarding fatalities, injuries, property damage, and crop damage. 
+  
+**Exhibit 1: Years of Data Collection for Fatalities, Injuries, Property Damage, and Crop Damage**
+```{r, echo=TRUE, fig.height=6, fig.width= 10}
+grid.arrange(fat_year, propdmg_year, inj_year, cropdmg_year, ncol = 2)
+```
+
+##### Narrowing dataset to a relevant trend
+The data set narrowed down to provide an relevant current analysis of the trends. Including data from the 1950 would not particularly have relevance as there was only specific events recorded. The data was narrowed down to a 15-year trend, starting at 1997 to 2011.      
+  
+```{r subsetting it down to a 15 yr trend, echo=TRUE, cache=TRUE}
+## Note this will need to be CACHE = TRUE
+## creating a 15 yr trend 1997 to 20111
+stormdata <- subset(stormdata, stormdata$YEAR >= 1997, )
+```
+
+This generates the totals for each of the four categories.  
+```{r total in the time period, echo=TRUE}
+total_fat <- aggregate(stormdata$FATALITIES, by = list(Year = stormdata$YEAR), sum, na.rm = TRUE)
+total_inj <- aggregate(stormdata$INJURIES, by = list(Year = stormdata$YEAR), sum, na.rm = TRUE)
+total_prop <- round(aggregate(stormdata$PROPDMG, by = list(Year = stormdata$YEAR), sum, na.rm = TRUE), 0)
+total_crop <- round(aggregate(stormdata$CROPDMG, by = list(Year = stormdata$YEAR), sum, na.rm = TRUE), 0)
+total <- cbind(total_fat, total_inj[,2], total_prop[,2], total_crop[,2])
+colnames(total)[2:5] <- c("Fatalities", "Injuries", "Property Damage (in dollars)", "Crop Damage (in dollars)")
+total[,2:5] <- format(total[,2:5], big.mark = ",")
+```
+
+Exhibit 2 shows the total fatalities, injuries, property damage, and crop damage from 1997 to 2011. After 1998, the impact on the public health, in terms of fatalities and injuries, and economy, in terms of property and crop damage, seemed to have decline; however, in 2011 there is tremendous spike in all four categories.
+  
+**Exhibit 2: Total Fatalities, Injuries, Property Damage, and Crop Damage, 1997-2011**
+```{r, echo=TRUE}
+knitr::kable(total)
+```
+
+This generates the total by event type and selects the 10 highest events.  
+```{r top events, echo=TRUE}
+## By EVTYPE charts
+        ## fatal
+fatal <- aggregate(stormdata$FATALITIES, by = list(EVTYPE = stormdata$EVTYPE), sum, na.rm = TRUE)
+colnames(fatal)[2] <- "FATALITIES"
+fatal <- subset(fatal, fatal$FATALITIES > 0,)
+        ## injury
+injury <- aggregate(stormdata$INJURIES, by = list(EVTYPE = stormdata$EVTYPE), sum, na.rm = TRUE)
+colnames(injury)[2] <- "INJURIES"
+injury <- subset(injury, injury$INJURIES > 0,)
+        ## property damage
+prop_damage <- aggregate(stormdata$PROPDMG, by = list(EVTYPE = stormdata$EVTYPE), sum, na.rm = TRUE)
+colnames(prop_damage)[2] <- "PROP_DAMAGE"
+prop_damage <- subset(prop_damage, prop_damage$PROP_DAMAGE > 0,)
+        ## crop damage
+crop_damage <- aggregate(stormdata$CROPDMG, by = list(EVTYPE = stormdata$EVTYPE), sum, na.rm = TRUE)
+colnames(crop_damage)[2] <- "CROP_DAMAGE" 
+crop_damage <- subset(crop_damage, crop_damage$CROP_DAMAGE > 0, )
+        ## top 10
+fatal_top10 <- head(arrange(fatal, -FATALITIES), 10)
+injury_top10 <- head(arrange(injury, -INJURIES), 10)
+prop_damage10 <- head(arrange(prop_damage, -PROP_DAMAGE), 10)
+prop_damage10$PROP_DAMAGE <- round(prop_damage10$PROP_DAMAGE, 0)
+crop_damage10 <- head(arrange(crop_damage, -CROP_DAMAGE), 10)
+crop_damage10$CROP_DAMAGE <- round(crop_damage10$CROP_DAMAGE, 0)
+```
+
+### Results
+
+```{r top charts, echo=TRUE}
+## Top charts
+fat_10 <- ggplot(fatal_top10, aes(x = reorder(EVTYPE, FATALITIES), y = FATALITIES)) +
+        geom_bar(stat = "identity", fill = "firebrick", color = "firebrick") +
+        coord_flip() +
+        ylab("Number of Fatalities") +
+        xlab("Event Type") +
+        ggtitle("10 Highest Events Resulting in Fatalities") +
+        theme(legend.position = "none", plot.title = element_text(size = 10, face = "bold"))
+inj_10 <- ggplot(injury_top10, aes(x = reorder(EVTYPE, INJURIES), y = INJURIES)) +
+        geom_bar(stat = "identity", fill = "firebrick", color = "firebrick") +
+        coord_flip() +
+        ylab("Number of Injuries") +
+        xlab("Event Type") +
+        ggtitle("10 Highest Events Resulting in Injuries") +
+        theme(legend.position = "none", plot.title = element_text(size = 10, face = "bold"))
+prop_10 <- ggplot(prop_damage10, aes(x = reorder(EVTYPE, PROP_DAMAGE), y = log10(PROP_DAMAGE))) +
+        geom_bar(stat = "identity", fill = "firebrick", color = "firebrick") +
+        coord_flip() +
+        ylab("Amount of Property Damage (based on log-scale)") +
+        xlab("Event Type") +
+        ggtitle("10 Highest Events Resulting in Property Damage") +
+        theme(legend.position = "none", plot.title = element_text(size = 10, face = "bold"))
+crop_10 <- ggplot(crop_damage10, aes(x = reorder(EVTYPE, CROP_DAMAGE), y = log10(CROP_DAMAGE))) +
+        geom_bar(stat = "identity", fill = "firebrick", color = "firebrick") +
+        coord_flip() +
+        ylab("Amount of Property Damage (based on log-scale)") +
+        xlab("Event Type") +
+        ggtitle("10 Highest Events Resulting in Crop Damage") +
+        theme(legend.position = "none", plot.title = element_text(size = 10, face = "bold"))
+```
+
+Exhibit 3 displays the 10 highest events resulting in an impact on the public health and economy. Of the public health, a large number of fatalities seem to stem from `r fatal_top10[1,1]` followed by `r fatal_top10[2,1]`es, while injuries seem to stem from `r injury_top10[1,1]`es followed by `r injury_top10[2,1]`s. For the impact of the economy, the property damage largely result from `r prop_damage10[1,1]`s, `r prop_damage10[2,1]`s, and/or `r prop_damage10[3,1]`es, while crops seem to be largely damaged by `r crop_damage10[1,1]`, `r crop_damage10[2,1]`s, and/or `r crop_damage10[3,1]`s.
+
+**Exhibit 3: 10 Highest Events Resulting in Fatalities, Injuries, Property Damage, and Crop Damage, 1997-2011**
+```{r, echo=TRUE, fig.height=6, fig.width= 10}
+grid.arrange(fat_10, prop_10, inj_10, crop_10, ncol = 2)
+```
+
+### Further Analysis
+Further analysis will need or should be conducted to combine event types in related categories to see how the related categories impact the public health and economy of the United States.
